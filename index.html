@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Heart Disease Risk Predictor</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 680px; margin: 32px auto; padding: 0 16px; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .sub { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
+    form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    label { display: flex; flex-direction: column; font-size: 0.85rem; gap: 4px; }
+    input, select { padding: 9px; font-size: 1rem; border-radius: 6px; border: 1px solid #8884; }
+    button { grid-column: span 2; padding: 12px; font-size: 1rem; cursor: pointer; border-radius: 6px; border: 0; background: #2563eb; color: #fff; }
+    #result { margin-top: 22px; padding: 18px; border-radius: 10px; border: 1px solid #8884; display: none; }
+    #bar { height: 10px; border-radius: 5px; background: #8883; margin-top: 10px; overflow: hidden; }
+    #fill { height: 100%; width: 0; background: #2563eb; transition: width .4s; }
+    .note { font-size: 0.8rem; color: #888; margin-top: 18px; }
+    @media (max-width: 520px) { form { grid-template-columns: 1fr; } button { grid-column: span 1; } }
+  </style>
+</head>
+<body>
+  <h1>Heart Disease Risk Predictor</h1>
+  <div class="sub">Logistic Regression trained on the Statlog heart disease dataset (270 patients).</div>
+
+  <form id="form"></form>
+  <div id="result"></div>
+  <p class="note">Educational ML project only. Not a medical diagnosis or medical advice.</p>
+
+  <script>
+    const fields = [
+      { id: "age", label: "Age", type: "number", value: 54 },
+      { id: "sex", label: "Sex", type: "select", value: 1, options: [[1, "Male"], [0, "Female"]] },
+      { id: "cp", label: "Chest pain type (cp)", type: "select", value: 2, options: [[0, "0"], [1, "1"], [2, "2"], [3, "3"]] },
+      { id: "trestbps", label: "Resting blood pressure", type: "number", value: 130 },
+      { id: "chol", label: "Cholesterol", type: "number", value: 250 },
+      { id: "fbs", label: "Fasting blood sugar > 120", type: "select", value: 0, options: [[1, "Yes"], [0, "No"]] },
+      { id: "restecg", label: "Resting ECG (restecg)", type: "select", value: 0, options: [[0, "0"], [1, "1"], [2, "2"]] },
+      { id: "thalach", label: "Max heart rate (thalach)", type: "number", value: 150 },
+      { id: "exang", label: "Exercise induced angina", type: "select", value: 0, options: [[1, "Yes"], [0, "No"]] },
+      { id: "oldpeak", label: "ST depression (oldpeak)", type: "number", value: 1.0, step: "0.1" },
+      { id: "slope", label: "ST slope", type: "select", value: 1, options: [[0, "0"], [1, "1"], [2, "2"]] },
+      { id: "ca", label: "Major vessels (ca)", type: "select", value: 0, options: [[0, "0"], [1, "1"], [2, "2"], [3, "3"]] },
+      { id: "thal", label: "Thal", type: "select", value: 2, options: [[1, "1"], [2, "2"], [3, "3"]] },
+    ];
+
+    const form = document.getElementById("form");
+    form.innerHTML = fields.map(f => {
+      if (f.type === "select") {
+        const opts = f.options.map(([v, t]) =>
+          `<option value="${v}" ${v === f.value ? "selected" : ""}>${t}</option>`).join("");
+        return `<label>${f.label}<select id="${f.id}">${opts}</select></label>`;
+      }
+      return `<label>${f.label}<input type="number" id="${f.id}" value="${f.value}" step="${f.step || 1}" required></label>`;
+    }).join("") + `<button type="submit">Predict</button>`;
+
+    let model = null;
+    fetch("model.json").then(r => r.json()).then(m => (model = m));
+
+    function predict(values) {
+      let z = model.intercept;
+      for (let i = 0; i < model.features.length; i++) {
+        z += model.coef[i] * (values[i] - model.mean[i]) / model.scale[i];
+      }
+      return 1 / (1 + Math.exp(-z));
+    }
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const box = document.getElementById("result");
+      box.style.display = "block";
+      if (!model) { box.textContent = "Model is still loading, try again."; return; }
+      const values = model.features.map(name => parseFloat(document.getElementById(name).value));
+      const p = predict(values);
+      const level = p < 0.33 ? "Low" : p < 0.66 ? "Moderate" : "High";
+      box.innerHTML = `<b>Risk level: ${level}</b><br>
+        Probability of heart disease: ${(p * 100).toFixed(1)}%
+        <div id="bar"><div id="fill" style="width:${(p * 100).toFixed(0)}%"></div></div>`;
+    });
+  </script>
+</body>
+</html>
